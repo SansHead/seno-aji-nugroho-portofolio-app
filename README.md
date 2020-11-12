@@ -5,4 +5,6 @@
 ### Description: 
 This is displays a portofolio application which displays the Seno' API and Microservices work as part of the FCC curriculum.
 
+Right?.
+
 Other pages will be added in the future to complete this app as a fortofolio project.
