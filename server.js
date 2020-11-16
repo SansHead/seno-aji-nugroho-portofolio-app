@@ -57,6 +57,8 @@ app.get("/api/timestamp/:date_string", function(req,res)
     });
   }
 
+  
+
   if(passedInValue == "Invalid Date")
   {
     res.json({"error" : "Invalid Date"});
@@ -68,6 +70,17 @@ app.get("/api/timestamp/:date_string", function(req,res)
     })
   }
 });
+
+app.get("/api/whoami", function(req, res)
+  {
+    res.json
+    ({
+      "ipAddress": req.connection.remoteAddress,
+      "language": req.headers["accept-language"],
+      "software": req.headers["user-agent"],
+      //"req-headers": req.headers
+    })
+  });
 
 // listen for requests :)
 var listener = app.listen(port, function () {
