@@ -28,6 +28,9 @@ app.get("/api/hello", function (req, res) {
 
 app.get("/api/timestamp/:date_string", function(req,res)
 {
+  let dateString = req.params.date_string;
+console.log(dateString);
+
   res.json({"error" : "Invalid Date"});
 });
 
