@@ -12,6 +12,7 @@ var app = express();
 var mongo = require('mongodb');
 var mongoose = require('mongoose');
 var shortid = require('shortid');
+const dns = require('dns');
 var port = process.env.PORT || 3000
 
 
@@ -102,57 +103,68 @@ app.get("/api/whoami", function(req, res)
     });
   });
 
-  // URL Shortener Project
+    // URL Shortener Project
   
+    app.use(bodyParser.urlencoded({extended: false}));
   // Build a Schema and model to store saved URLs
 
-  var ShortURL= mongoose.model('ShortURL', new mongoose.Schema({ 
-    short_url: String,
-    original_url: String,
-    suffix: String 
-    
-  }));
+  const links = [];
+  let id = 0;
 
-  // parse application/x-www-form-urlencoded
-  app.use(bodyParser.urlencoded({ extended: false }))
- 
-  // parse application/json
-  app.use(bodyParser.json())
-  app.post("/api/shorturl/new", function (req, res) 
+  app.post('/api/shorturl/new', function (req, res)
   {
+    console.log('body', req.body);
+    const { url } = req.body;
+    const noHTTPSurl = url.replace(/^https?:\/\//, '');
 
-    let client_requested_url = req.body.url
-    let suffix = shortid.generate();
-    let newShortURL = suffix
-
-
-    let newURL = new ShortURL({
-
-      short_url: __dirname + "/api/shorturl/" + suffix,
-      original_url: client_requested_url,
-      suffix: suffix
-    });
-
-    newURL.save(function(err, data)
+    //check if this valid
+    dns.lookup(noHTTPSurl, function (err)
+    {
+      if(err)
       {
-      if(err) return console.error(err);
-      res.json({
-      "saved": true,
-      "short_url": newURL.short_url,
-      "original_url": newURL.original_url,
-      "suffix": newURL.suffix
-      });
+        return res.json({
+            "error" : "invalid URL" 
+          });
+      }else 
+      {
+        //increment id
+        id++
+
+        //create entry to our array
+        const link = 
+        {
+          original_url: url,
+          short_url: id.toString()
+        };
+
+        links.push(link);
+
+        console.log(links);
+
+        //return this new entry
+          return res.json(link)
+      }
     });
   });
 
-  app.get("/api/shorturl/:suffix", function(req, res)
+  app.get('/api/shorturl/:id', function (req, res)
   {
-    let GeneratedSuffix = req.params.suffix
-    ShortURL.find({suffix: GeneratedSuffix}).then(function(foundURLS) {
-      let urlForRedirect = foundURLS[0];
-      res.redirect(urlForRedirect.original_url);
+    const { id } = req.params;
+
+    console.log('id from query', id );
+
+    const link = links.find(l => l.short_url === id)
+
+    console.log('link found', link);
+
+    if(link){
+      return res.redirect(link.original_url);
+    }else{
+      return res.json({
+        error: 'No Short URL'
       });
-    });
+    }
+  });
 
 // listen for requests :)
 var listener = app.listen(port, function () {
