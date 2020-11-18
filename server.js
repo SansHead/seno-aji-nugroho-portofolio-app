@@ -134,7 +134,7 @@ app.get("/api/whoami", function(req, res)
         const link = 
         {
           original_url: url,
-          short_url: id.toString()
+          short_url: `${id}`
         };
 
         links.push(link);
