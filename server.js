@@ -15,12 +15,13 @@ var shortid = require('shortid');
 const dns = require('dns');
 var port = process.env.PORT || 3000
 
+// connecting to mongodb
+let uri = 'mongodb+srv://RatHead:admin123@clushead.t9tw1.mongodb.net/ClusHead?retryWrites=true&w=majority'
+mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false });
 
-mongoose.connect(database_uri, 
-{ 
-  useNewUrlParser: true, 
-  useUnifiedTopology: true
-});
+// using bodyParser
+app.use(bodyParser.urlencoded({extended: false}));
+app.use(bodyParser.json())
 
 // enable CORS (https://en.wikipedia.org/wiki/Cross-origin_resource_sharing)
 // so that your API is remotely testable by FCC 
@@ -29,6 +30,8 @@ app.use(cors({optionsSuccessStatus: 200}));  // some legacy browsers choke on 20
 
 // http://expressjs.com/en/starter/static-files.html
 app.use(express.static('public'));
+
+
 
 // http://expressjs.com/en/starter/basic-routing.html
 app.get("/", function (req, res) {
@@ -45,6 +48,10 @@ app.get("/requestHeaderParser", function (req, res) {
 
 app.get("/urlshortenermicroservices", function (req, res) {
   res.sendFile(__dirname + '/views/urlshortenermicroservices.html');
+});
+
+app.get("/exercisetracker", function (req, res) {
+  res.sendFile(__dirname + '/views/exercisetracker.html');
 });
 
 
@@ -103,68 +110,119 @@ app.get("/api/whoami", function(req, res)
     });
   });
 
-    // URL Shortener Project
+    /* Database Connection */
+
+
+let urlSchema = new mongoose.Schema({
+  original : {type: String, required: true},
+  short: Number
+})
+
+let Url = mongoose.model('Url', urlSchema)
+
+let responseObject = {}
+app.post('/api/shorturl/new', bodyParser.urlencoded({ extended: false }) , (request, response) => {
+  let inputUrl = request.body['url'];
   
-    app.use(bodyParser.urlencoded({extended: false}));
-  // Build a Schema and model to store saved URLs
-
-  const links = [];
-  let id = 0;
-
-  app.post('/api/shorturl/new', function (req, res)
-  {
-    console.log('body', req.body);
-    const { url } = req.body;
-    const noHTTPSurl = url.replace(/^https?:\/\//, '');
-
-    //check if this valid
-    dns.lookup(noHTTPSurl, function (err)
-    {
-      if(err)
-      {
-        return res.json({
-            "error" : "invalid URL" 
-          });
-      }else 
-      {
-        //increment id
-        id++
-
-        //create entry to our array
-        const link = 
-        {
-          original_url: url,
-          short_url: `${id}`
-        };
-
-        links.push(link);
-
-        console.log(links);
-
-        //return this new entry
-          return res.json(link)
-      }
-    });
+  let urlRegex = new RegExp(/^https?:\/\//, '');
+  
+  if(!inputUrl.match(urlRegex)){
+    response.json({error: 'Invalid url'});
+    return;
+  }
+    
+  responseObject['original_url'] = inputUrl
+  
+  let inputShort = 1
+  
+  Url.findOne({})
+        .sort({short: 'desc'})
+        .exec((error, result) => {
+          if(!error && result != undefined){
+            inputShort = result.short + 1
+          }
+          if(!error){
+            Url.findOneAndUpdate(
+              {original: inputUrl},
+              {original: inputUrl, short: inputShort},
+              {new: true, upsert: true },
+              (error, savedUrl)=> {
+                if(!error){
+                  responseObject['short_url'] = savedUrl.short;
+                  response.json(responseObject);
+                }
+              }
+            )
+          }
   });
+  
+});
 
-  app.get('/api/shorturl/:id', function (req, res)
-  {
-    const { id } = req.params;
-
-    console.log('id from query', id );
-
-    const link = links.find(l => l.short_url === id)
-
-    console.log('link found', link);
-
-    if(link){
-      return res.redirect(link.original_url);
+app.get('/api/shorturl/:input', (request, response) => {
+  let input = request.params.input
+  
+  Url.findOne({short: input}, (error, result) => {
+    if(!error && result != undefined){
+      response.redirect(result.original);
     }else{
-      return res.json({
-        error: 'No Short URL'
-      });
+      response.json('URL not Found');
     }
   });
+});
+
+
+  //Exercise Tracker
+
+// 1
+
+const users = [];
+
+app.post('/api/exercise/new-user', function(req,res)
+{
+  const{username} = req.body;
+
+  const newUser = 
+  {
+    username,
+    _id: shortid.generate()
+  }
+  users.push(newUser);
+
+  console.log(users);
+  return res.json(newUser);
+});
+
+// 2
+
+app.post('/api/exercise/users', function(req,res)
+{
+  return res.json(users);
+});
+
+
+//   // Not found middleware
+// app.use((req, res, next) => {
+//   return next({status: 404, message: 'not found'})
+// })
+
+// // Error Handling middleware
+// app.use((err, req, res, next) => {
+//   let errCode, errMessage
+
+//   if (err.errors) {
+//     // mongoose validation error
+//     errCode = 400 // bad request
+//     const keys = Object.keys(err.errors)
+//     // report the first validation error
+//     errMessage = err.errors[keys[0]].message
+//   } else {
+//     // generic or custom error
+//     errCode = err.status || 500
+//     errMessage = err.message || 'Internal Server Error'
+//   }
+//   res.status(errCode).type('txt')
+//     .send(errMessage)
+// });
 
 // listen for requests :)
 var listener = app.listen(port, function () {
